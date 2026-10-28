@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kingston Ward · Bishopric</title>
+<meta name="theme-color" content="#0d9488">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bishopric">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f7fa;--paper:#fff;--ink:#0f172a;--muted:#64748b;--line:#e6e9ef;--accent:#0d9488;--danger:#c2410c}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1016;--paper:#131a23;--ink:#e7edf4;--muted:#8a97a8;--line:#222c38;--accent:#2dd4bf;--danger:#fb923c}}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px 16px calc(24px + env(safe-area-inset-bottom))}
+.card{width:100%;max-width:380px;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:32px 24px;text-align:center;box-shadow:0 12px 32px rgba(15,23,42,.08)}
+.logo{width:72px;height:72px;border-radius:18px;display:block;margin:0 auto 16px}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
+p{color:var(--muted);margin:0 0 22px}
+#gbtn{display:flex;justify-content:center;min-height:44px}
+.err{color:var(--danger);font-size:14px;margin:16px 0 0;min-height:1em}
+.small{font-size:13px;color:var(--muted);margin:18px 0 0}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);margin:8px auto 0;animation:s .9s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+.btn{border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:10px 18px;font:inherit;font-weight:600;cursor:pointer;color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card" id="card">
+  <img class="logo" src="icon-192.png" alt="">
+  <h1>Kingston Ward</h1>
+  <p>Bishopric</p>
+  <div class="spin" id="spin"></div>
+</div></div>
+<script>
+/* Kingston Ward · Bishopric — installable shell.
+   Signs in with Google (name + email only), then loads the Bishopric Board from its Apps Script API.
+   Nothing ward-related lives in this file; the API checks every request against the Members list. */
+var API_URL = 'https://script.google.com/macros/s/AKfycbxTmstrn1ETmsEnobIx9-MB12Mw8LCsdHlzGO41-UxkxitVuE224xnl8wTXhK3BlzRo/exec';           // "App API" deployment of the Bishopric Board script
+var CLIENT_ID = '781984210146-toor95vmf1716m7qefm9utperhj0n56u.apps.googleusercontent.com';
+var KEY = 'bb_session';
+
+function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function post(body) {
+  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+    .then(function (r) { return r.json(); });
+}
+function card(html) { document.getElementById('card').innerHTML = '<img class="logo" src="icon-192.png" alt=""><h1>Kingston Ward</h1><p>Bishopric</p>' + html; }
+function iosStandalone() { return window.navigator.standalone === true; }
+
+// Session handed back by the redirect sign-in (iPhone home-screen app)
+(function () {
+  var m = /[#&]session=([^&]+)/.exec(location.hash);
+  if (m) { store(KEY, decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname); }
+})();
+
+function boot() {
+  var s = read(KEY);
+  if (!s) return signInScreen();
+  card('<div class="spin"></div><p class="small">Loading…</p>');
+  post({ fn: 'app', session: s }).then(function (j) {
+    if (!j.ok) { if (j.auth) { store(KEY, null); return signInScreen(); } throw new Error(j.error); }
+    var shim = '<script>(' + appShim.toString() + ')(' + JSON.stringify(API_URL) + ',' + JSON.stringify(KEY) + ');<\/script>';
+    var html = j.result.replace(/<head>/i, '<head>' + shim);
+    document.open(); document.write(html); document.close();
+  }).catch(function (e) {
+    card('<p class="err">Couldn’t load: ' + String(e.message || e) + '</p><button class="btn" onclick="boot()">Try again</button>');
+  });
+}
+
+// Runs inside the loaded app: stands in for Apps Script's google.script.run.
+function appShim(API, KEY) {
+  function sess() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function call(fn, args, ok, fail) {
+    fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args, session: sess() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.ok) { if (ok) ok(j.result); return; }
+        if (j.auth) { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); return; }
+        if (fail) fail(new Error(j.error || 'Something went wrong'));
+      })
+      .catch(function (e) { if (fail) fail(new Error('Couldn’t reach the server. Check your connection and try again.')); });
+  }
+  function runner(ok, fail) {
+    return new Proxy({}, { get: function (_, k) {
+      if (k === 'withSuccessHandler') return function (h) { return runner(h, fail); };
+      if (k === 'withFailureHandler') return function (h) { return runner(ok, h); };
+      return function () { call(k, [].slice.call(arguments), ok, fail); };
+    } });
+  }
+  window.google = { script: { run: runner(null, null), host: { close: function () {} } } };
+  window.__BB_APP = true;
+  window.__BB_signOut = function () {
+    var s = sess();
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'signOut', session: s }) })
+      .finally(function () { location.reload(); });
+  };
+}
+
+function signInScreen(msg) {
+  card('<div id="gbtn"></div><p class="err" id="err">' + (msg || '') + '</p><p class="small">Use the Google account on the bishopric list.</p>');
+  if (!API_URL || !CLIENT_ID) { document.getElementById('err').textContent = 'Sign-in is being set up.'; return; }
+  var s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+  s.onload = function () {
+    var redirect = iosStandalone();
+    google.accounts.id.initialize({
+      client_id: CLIENT_ID, callback: onCredential, auto_select: true, cancel_on_tap_outside: false,
+      ux_mode: redirect ? 'redirect' : 'popup', login_uri: redirect ? API_URL : undefined, itp_support: true
+    });
+    google.accounts.id.renderButton(document.getElementById('gbtn'), { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', width: 280 });
+    if (!redirect) google.accounts.id.prompt();
+  };
+  s.onerror = function () { document.getElementById('err').textContent = 'Couldn’t load Google sign-in. Check your connection.'; };
+  document.head.appendChild(s);
+}
+function onCredential(resp) {
+  card('<div class="spin"></div><p class="small">Signing in…</p>');
+  post({ fn: 'signIn', idToken: resp.credential }).then(function (j) {
+    if (!j.ok) return signInScreen(j.error);
+    store(KEY, j.result.session); boot();
+  }).catch(function () { signInScreen('Couldn’t reach the server. Try again.'); });
+}
+boot();
+</script>
+</body>
+</html>
