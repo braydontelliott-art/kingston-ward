@@ -158,7 +158,7 @@ function normalize(d) {
     return { date: n.date, text: /Fast|Conference/.test(n.type || '') && !lines(n.speakers).length ? n.type : lines(n.speakers).map(function (l) { return splitSpeaker(l).n; }).join(', ') };
   });
   out.events = (d.events || []).map(function (e, i) {
-    var ev = { id: (e.date || '') + '-' + slug(e.title), title: e.title || 'Event', location: e.location || '', stake: !!e.stake };
+    var ev = { id: (e.date || '') + '-' + slug(e.title), date: e.date, rawTitle: e.title || '', title: e.title || 'Event', location: e.location || '', stake: !!e.stake };
     if (e.start) { ev.start = zonedIso(e.date, e.start); if (e.end) ev.end = zonedIso(e.date, e.end); }
     else { ev.start = e.date; ev.allDay = true; }
     return ev;
@@ -192,20 +192,6 @@ function evRange(ev) {
   if (isAllDay(ev)) { var s = ev.start.slice(0, 10); return { allDay: true, s: ymdCompact(s), e: ymdCompact(ev.end ? nextDay(ev.end.slice(0, 10)) : nextDay(s)) }; }
   var start = new Date(ev.start), end = ev.end ? new Date(ev.end) : new Date(start.getTime() + 60 * 60 * 1000);
   return { allDay: false, s: utcStamp(start), e: utcStamp(end) };
-}
-function icsText(v) { return String(v || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1'); }
-function icsFor(ev) {
-  var r = evRange(ev);
-  var lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Kingston Ward//Bulletin//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
-    'UID:' + icsText(ev.id || (r.s + '-' + ev.title)) + '@kwbishopric.org',
-    'DTSTAMP:' + utcStamp(new Date()),
-    r.allDay ? 'DTSTART;VALUE=DATE:' + r.s : 'DTSTART:' + r.s,
-    r.allDay ? 'DTEND;VALUE=DATE:' + r.e : 'DTEND:' + r.e,
-    'SUMMARY:' + icsText(ev.title)];
-  if (ev.location) lines.push('LOCATION:' + icsText(ev.location));
-  if (ev.description) lines.push('DESCRIPTION:' + icsText(ev.description));
-  lines.push('END:VEVENT', 'END:VCALENDAR');
-  return lines.join('\r\n');
 }
 function googleUrl(ev) {
   var r = evRange(ev);
@@ -267,12 +253,12 @@ function render(raw) {
   h += '<section class="up" aria-labelledby="up-h"><h2 id="up-h">Coming up</h2>';
   if (!evs.length) h += '<p class="empty">Nothing on the calendar yet.</p>';
   h += evs.map(function (ev, i) {
-    var ics = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsFor(ev));
+    var ics = API_URL + '?page=ics&d=' + encodeURIComponent(ev.date || '') + '&t=' + encodeURIComponent(ev.rawTitle || '');
     var meta = fmtEventWhen(ev) + (ev.location ? ' · ' + esc(ev.location) : '');
     return '<div class="ev"><div><div class="name">' + esc(ev.title) + (ev.stake ? ' <span class="tag">Stake</span>' : '') + '</div><div class="meta">' + meta + '</div></div>' +
       '<div class="addwrap"><button type="button" class="add" aria-haspopup="true" aria-expanded="false" aria-controls="m' + i + '" aria-label="Add ' + esc(ev.title) + ' to calendar">' + CAL_ICON + 'Add to calendar</button>' +
       '<div class="menu" id="m' + i + '" role="menu">' +
-        '<a role="menuitem" href="' + ics + '" download="' + slug(ev.title) + '.ics">Apple, Outlook &amp; others</a>' +
+        '<a role="menuitem" href="' + esc(ics) + '">Apple, Outlook &amp; others</a>' +
         '<a role="menuitem" href="' + esc(googleUrl(ev)) + '" target="_blank" rel="noopener">Google Calendar</a>' +
       '</div></div></div>';
   }).join('');
