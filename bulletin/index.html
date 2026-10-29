@@ -48,7 +48,9 @@ h1 em{font-style:italic}
 .program li.row{padding:20px 0}
 .notes{margin:20px 16px 0;padding:20px;background:var(--card);border-radius:18px;display:flex;flex-direction:column;gap:14px}
 .notes p{margin:0;white-space:pre-line}
-.notes .t{font-weight:600}
+.notes h2{font-size:24px;margin:0}
+.topic{display:block;font-size:14px;color:var(--muted);margin-top:4px}
+.tag{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--line-2);border-radius:999px;padding:1px 7px;vertical-align:2px;margin-left:4px}
 section.up{padding:36px 24px 0}
 h2{margin:0 0 14px;font-family:var(--serif);font-weight:400;font-size:30px}
 .ev{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 0;border-top:1px solid var(--line-2)}
@@ -88,31 +90,81 @@ footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom)
 var API_URL = 'https://script.google.com/macros/s/AKfycbxTmstrn1ETmsEnobIx9-MB12Mw8LCsdHlzGO41-UxkxitVuE224xnl8wTXhK3BlzRo/exec';
 var TZ = 'America/Denver';
 
-/* Sample data: open the page with ?sample to preview the design without the API. */
+/* Sample data in the same shape getBulletinData_() returns. Open the page with ?sample to preview. */
 var SAMPLE = {
-  ok: true, ward: 'Kingston Ward',
+  wardName: 'Kingston Ward', meetingTime: '11:30 AM', today: '2026-10-28',
   meeting: {
-    title: 'Fast & testimony meeting', date: '2026-11-01', time: '11:30 AM',
-    roles: [{ label: 'Conducting', name: 'Ken' }, { label: 'Chorister', name: 'Jim Manning' }, { label: 'Organist', name: 'Meg Naisbitt' }],
-    items: [
-      { type: 'hymn', label: 'Opening hymn', number: 138, title: 'Bless Our Fast, We Pray' },
-      { type: 'part', text: 'Ward & stake business' },
-      { type: 'hymn', label: 'Sacrament hymn', number: 191, title: 'Behold the Great Redeemer Die' },
-      { type: 'part', text: 'Administration of the sacrament' },
-      { type: 'part', text: 'Bearing of testimonies' },
-      { type: 'hymn', label: 'Closing hymn', number: 0, title: '[Hymn title]' },
-      { type: 'person', label: 'Closing prayer', name: '[Name]' }
-    ]
+    date: '2026-11-01', type: 'Fast & testimony meeting', presiding: '', conducting: 'Ken', chorister: 'Jim Manning', organist: 'Meg Naisbitt',
+    openingHymn: '#138 Bless Our Fast, We Pray', sacramentHymn: '#191 Behold the Great Redeemer Die', intermediateHymn: '', musicalNumber: '',
+    intermediateAfter: '', closingHymn: '[#] [Hymn title]', invocation: '[Name]', benediction: '[Name]', speakers: '', announcements: ''
   },
-  announcements: [],
+  next: [{ date: '2026-11-08', type: 'Sacrament meeting', speakers: '[Speaker] — [Topic]\n[Speaker]' }],
   events: [
-    { id: 'sample-1', title: '[Ward event]', start: '2026-11-07T18:00:00-07:00', end: '2026-11-07T20:00:00-07:00', location: '[Place]' },
-    { id: 'sample-2', title: '[All-day event]', start: '2026-11-14', allDay: true, location: '' }
+    { title: '[Ward event]', date: '2026-11-07', start: '18:00', end: '20:00', location: '[Place]' },
+    { title: '[Stake event]', date: '2026-11-14', start: '', end: '', location: '', stake: true }
   ]
 };
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function $(id) { return document.getElementById(id); }
+function lines(s) { return String(s || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean); }
+function splitSpeaker(line) { var m = String(line).match(/^(.*?)(?:\s+[—–-]\s+|:\s+)(.*)$/); return m ? { n: m[1].trim(), t: m[2].trim() } : { n: String(line).trim(), t: '' }; }
+function hymn(label, v) { var m = String(v).match(/^#?\s*(\d+)\s*[.\-–—:]?\s*(.*)$/); return m ? { type: 'hymn', label: label, number: m[1], title: m[2] || '' } : { type: 'hymn', label: label, title: String(v) }; }
+
+/* Denver wall-clock time on a date → an absolute moment (handles daylight saving). */
+function zonedIso(ymd, hhmm) {
+  var p = ymd.split('-'), t = String(hhmm).split(':');
+  var guess = Date.UTC(+p[0], +p[1] - 1, +p[2], +t[0] || 0, +t[1] || 0);
+  var parts = {}; new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    .formatToParts(new Date(guess)).forEach(function (x) { parts[x.type] = x.value; });
+  var shown = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute);
+  return new Date(guess + (guess - shown)).toISOString();
+}
+
+/* getBulletinData_() → what the page renders. */
+function normalize(d) {
+  var m = d.meeting, out = { ward: d.wardName || 'Kingston Ward', meeting: null, announcements: [], next: [], events: [] };
+  if (m) {
+    var conf = /Conference/.test(m.type || '') && m.type !== 'Ward Conference', fast = /Fast/.test(m.type || '');
+    var mt = { title: m.type && m.type !== 'Sacrament meeting' ? m.type : 'Sacrament meeting', date: m.date, time: d.meetingTime || '', roles: [], items: [], note: '' };
+    if (conf) mt.note = m.type + ' — no sacrament meeting in the ward building today.';
+    else {
+      mt.roles = [['Presiding', m.presiding], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
+        .filter(function (r) { return r[1]; }).map(function (r) { return { label: r[0], name: r[1] }; });
+      var it = mt.items;
+      if (m.openingHymn) it.push(hymn('Opening hymn', m.openingHymn));
+      if (m.invocation) it.push({ type: 'person', label: 'Invocation', name: m.invocation });
+      it.push({ type: 'part', text: 'Ward & stake business' });
+      if (m.sacramentHymn) it.push(hymn('Sacrament hymn', m.sacramentHymn));
+      it.push({ type: 'part', text: 'Administration of the sacrament' });
+      var music = m.musicalNumber ? { type: 'person', label: 'Musical number', name: m.musicalNumber } : m.intermediateHymn ? hymn('Intermediate hymn', m.intermediateHymn) : null;
+      if (fast) it.push({ type: 'part', text: 'Bearing of testimonies' });
+      else {
+        var sp = lines(m.speakers), after = Math.max(1, parseInt(m.intermediateAfter, 10) || 2), placed = false;
+        sp.forEach(function (l, i) {
+          var s = splitSpeaker(l);
+          it.push({ type: 'talk', label: i === sp.length - 1 && sp.length > 1 ? 'Concluding speaker' : 'Speaker', name: s.n, topic: s.t });
+          if (music && !placed && i + 1 === after && i < sp.length - 1) { it.push(music); placed = true; }
+        });
+        if (music && !placed) it.push(music);
+      }
+      if (m.closingHymn) it.push(hymn('Closing hymn', m.closingHymn));
+      if (m.benediction) it.push({ type: 'person', label: 'Benediction', name: m.benediction });
+    }
+    out.meeting = mt;
+    out.announcements = lines(m.announcements).map(function (a) { return { text: a }; });
+  }
+  out.next = (d.next || []).filter(function (n) { return lines(n.speakers).length || /Fast|Conference/.test(n.type || ''); }).map(function (n) {
+    return { date: n.date, text: /Fast|Conference/.test(n.type || '') && !lines(n.speakers).length ? n.type : lines(n.speakers).map(function (l) { return splitSpeaker(l).n; }).join(', ') };
+  });
+  out.events = (d.events || []).map(function (e, i) {
+    var ev = { id: (e.date || '') + '-' + slug(e.title), title: e.title || 'Event', location: e.location || '', stake: !!e.stake };
+    if (e.start) { ev.start = zonedIso(e.date, e.start); if (e.end) ev.end = zonedIso(e.date, e.end); }
+    else { ev.start = e.date; ev.allDay = true; }
+    return ev;
+  });
+  return out;
+}
 
 function load() {
   if (/[?&]sample\b/.test(location.search)) return Promise.resolve(SAMPLE);
@@ -172,46 +224,52 @@ function titleHtml(t) {
   // Italicize "testimony" in the fast-meeting title, as in the design; everything else plain.
   return esc(t).replace(/\btestimony\b/i, function (m) { return '<em>' + m + '</em>'; });
 }
-function render(d) {
-  var m = d.meeting || {};
-  if (d.ward) { $('ward').textContent = d.ward; }
-  document.title = (d.ward || 'Kingston Ward') + ' · Bulletin';
-  $('when').textContent = (m.date ? fmtLongDay(m.date) : '') + (m.time ? ' · ' + m.time : '');
-  $('title').innerHTML = titleHtml(m.title || 'Sacrament meeting');
-
+function render(raw) {
+  var d = normalize(raw), m = d.meeting;
+  $('ward').textContent = d.ward;
+  document.title = d.ward + ' · Bulletin';
   var h = '';
-  var roles = (m.roles || []).filter(function (r) { return r && r.name; });
-  if (roles.length) {
-    h += '<section class="people" aria-label="Meeting leaders">' + roles.map(function (r) {
-      return '<div class="row"><span class="k">' + esc(r.label) + '</span><span class="v">' + esc(r.name) + '</span></div>';
+  if (!m) {
+    $('when').textContent = raw.meetingTime ? 'Sundays · ' + raw.meetingTime : '';
+    $('title').innerHTML = 'Sacrament meeting';
+    h += '<p class="status">This week’s program is being prepared. Check back soon.</p>';
+  } else {
+    $('when').textContent = (m.date ? fmtLongDay(m.date) : '') + (m.time ? ' · ' + m.time : '');
+    $('title').innerHTML = titleHtml(m.title);
+    if (m.note) h += '<p class="status">' + esc(m.note) + '</p>';
+    if (m.roles.length) {
+      h += '<section class="people" aria-label="Meeting leaders">' + m.roles.map(function (r) {
+        return '<div class="row"><span class="k">' + esc(r.label) + '</span><span class="v">' + esc(r.name) + '</span></div>';
+      }).join('') + '</section>';
+    }
+    if (m.items.length) {
+      h += '<ol class="program" aria-label="Order of meeting">' + m.items.map(function (it) {
+        if (it.type === 'hymn') {
+          var no = it.number ? ' · No. ' + esc(it.number) : '';
+          return '<li><span class="lbl">' + esc(it.label) + no + '</span><span class="hymn">' + esc(it.title) + '</span></li>';
+        }
+        if (it.type === 'talk') {
+          return '<li><span class="lbl">' + esc(it.label) + '</span><span class="hymn">' + esc(it.name) + '</span>' + (it.topic ? '<span class="topic">' + esc(it.topic) + '</span>' : '') + '</li>';
+        }
+        if (it.type === 'person') {
+          return '<li class="row"><span class="k">' + esc(it.label) + '</span><span class="v">' + esc(it.name) + '</span></li>';
+        }
+        return '<li><span class="part">' + esc(it.text) + '</span></li>';
+      }).join('') + '</ol>';
+    }
+  }
+  if (d.announcements.length) {
+    h += '<section class="notes" aria-labelledby="ann-h"><h2 id="ann-h">Announcements</h2>' + d.announcements.map(function (a) {
+      return '<p>' + esc(a.text) + '</p>';
     }).join('') + '</section>';
   }
-  var items = m.items || [];
-  if (items.length) {
-    h += '<ol class="program" aria-label="Order of meeting">' + items.map(function (it) {
-      if (it.type === 'hymn') {
-        var no = it.number ? ' · No. ' + esc(it.number) : '';
-        return '<li><span class="lbl">' + esc(it.label || 'Hymn') + no + '</span><span class="hymn">' + esc(it.title || '') + '</span></li>';
-      }
-      if (it.type === 'person' || it.type === 'talk') {
-        return '<li class="row"><span class="k">' + esc(it.label || '') + '</span><span class="v">' + esc(it.name || '') + '</span></li>';
-      }
-      return '<li><span class="part">' + esc(it.text || it.label || '') + '</span></li>';
-    }).join('') + '</ol>';
-  }
-  var notes = (d.announcements || []).filter(function (a) { return a && (a.title || a.text); });
-  if (notes.length) {
-    h += '<section class="notes" aria-label="Announcements">' + notes.map(function (a) {
-      return '<div>' + (a.title ? '<p class="t">' + esc(a.title) + '</p>' : '') + (a.text ? '<p>' + esc(a.text) + '</p>' : '') + '</div>';
-    }).join('') + '</section>';
-  }
-  var evs = d.events || [];
+  var evs = d.events;
   h += '<section class="up" aria-labelledby="up-h"><h2 id="up-h">Coming up</h2>';
   if (!evs.length) h += '<p class="empty">Nothing on the calendar yet.</p>';
   h += evs.map(function (ev, i) {
     var ics = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(icsFor(ev));
     var meta = fmtEventWhen(ev) + (ev.location ? ' · ' + esc(ev.location) : '');
-    return '<div class="ev"><div><div class="name">' + esc(ev.title) + '</div><div class="meta">' + meta + '</div></div>' +
+    return '<div class="ev"><div><div class="name">' + esc(ev.title) + (ev.stake ? ' <span class="tag">Stake</span>' : '') + '</div><div class="meta">' + meta + '</div></div>' +
       '<div class="addwrap"><button type="button" class="add" aria-haspopup="true" aria-expanded="false" aria-controls="m' + i + '" aria-label="Add ' + esc(ev.title) + ' to calendar">' + CAL_ICON + 'Add to calendar</button>' +
       '<div class="menu" id="m' + i + '" role="menu">' +
         '<a role="menuitem" href="' + ics + '" download="' + slug(ev.title) + '.ics">Apple, Outlook &amp; others</a>' +
@@ -219,6 +277,11 @@ function render(d) {
       '</div></div></div>';
   }).join('');
   h += '</section>';
+  if (d.next.length) {
+    h += '<section class="up" aria-labelledby="nx-h"><h2 id="nx-h">In the weeks ahead</h2>' + d.next.map(function (n) {
+      return '<div class="ev"><div><div class="name">' + esc(fmtLongDay(n.date)) + '</div><div class="meta">' + esc(n.text) + '</div></div></div>';
+    }).join('') + '</section>';
+  }
   $('main').innerHTML = h;
 }
 
@@ -243,7 +306,7 @@ document.addEventListener('click', function (e) {
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(); });
 
 load().then(function (d) {
-  if (!d || d.ok === false) throw new Error((d && d.error) || 'unavailable');
+  if (!d || d.ok === false || d.error) throw new Error((d && d.error) || 'unavailable');
   render(d);
 }).catch(function () {
   $('main').innerHTML = '<p class="status">The bulletin isn’t available right now. Please check back in a few minutes.</p>';
