@@ -83,26 +83,35 @@ function boot() {
   if (RETURN_ERR) { var m = RETURN_ERR; RETURN_ERR = ''; return signInScreen(m); }
   var s = read(KEY);
   if (!s) return signInScreen();
+  // Fast start: open the copy of the app saved on this device; the app quietly fetches a fresh copy for next time.
+  var saved = read(APP_HTML);
+  if (saved) return show(saved);
   card('<div class="spin"></div><p class="small">Loading…</p>');
   post({ fn: 'app', session: s }).then(function (j) {
     if (!j.ok) { if (j.auth) { store(KEY, null); return signInScreen(); } throw new Error(j.error); }
-    var shim = '<script>(' + appShim.toString() + ')(' + JSON.stringify(API_URL) + ',' + JSON.stringify(KEY) + ');<\/script>';
-    var html = j.result.replace(/<head>/i, '<head>' + shim);
-    document.open(); document.write(html); document.close();
+    store(APP_HTML, j.result); show(j.result);
   }).catch(function (e) {
     card('<p class="err">Couldn’t load: ' + String(e.message || e) + '</p><button class="btn" onclick="boot()">Try again</button>');
   });
 }
 
+var APP_HTML = 'bb_app_html';
+function show(html) {
+  var shim = '<script>(' + appShim.toString() + ')(' + JSON.stringify(API_URL) + ',' + JSON.stringify(KEY) + ',' + JSON.stringify(APP_HTML) + ');<\/script>';
+  document.open(); document.write(html.replace(/<head>/i, '<head>' + shim)); document.close();
+}
+
 // Runs inside the loaded app: stands in for Apps Script's google.script.run.
-function appShim(API, KEY) {
+function appShim(API, KEY, APP_HTML) {
+  // Wipe what this device saved for the app (sign-in, saved data, saved app copy).
+  function wipe() { try { Object.keys(localStorage).forEach(function (k) { if (k === KEY || k === APP_HTML || k.indexOf('bb_data:') === 0) localStorage.removeItem(k); }); } catch (e) {} }
   function sess() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function call(fn, args, ok, fail) {
     fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args, session: sess() }) })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (j.ok) { if (ok) ok(j.result); return; }
-        if (j.auth) { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); return; }
+        if (j.auth) { wipe(); location.reload(); return; }
         if (fail) fail(new Error(j.error || 'Something went wrong'));
       })
       .catch(function (e) { if (fail) fail(new Error('Couldn’t reach the server. Check your connection and try again.')); });
@@ -116,9 +125,16 @@ function appShim(API, KEY) {
   }
   window.google = { script: { run: runner(null, null), host: { close: function () {} } } };
   window.__BB_APP = true;
+  // Keep the saved copy of the app current for next time (after it has loaded).
+  setTimeout(function () {
+    fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'app', session: sess() }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (j.ok && j.result) { try { if (localStorage.getItem(APP_HTML) !== j.result) localStorage.setItem(APP_HTML, j.result); } catch (e) {} } })
+      .catch(function () {});
+  }, 8000);
   window.__BB_signOut = function () {
     var s = sess();
-    try { localStorage.removeItem(KEY); } catch (e) {}
+    wipe();
     fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'signOut', session: s }) })
       .finally(function () { location.reload(); });
   };
