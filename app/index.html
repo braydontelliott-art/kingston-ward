@@ -107,7 +107,7 @@ function show(html) {
 // Runs inside the loaded app: stands in for Apps Script's google.script.run.
 function appShim(API, KEY, APP_HTML) {
   // Wipe what this device saved for the app (sign-in, saved data, saved app copy).
-  function wipe() { try { Object.keys(localStorage).forEach(function (k) { if (k === KEY || k === APP_HTML || k.indexOf('bb_data:') === 0) localStorage.removeItem(k); }); } catch (e) {} }
+  function wipe() { try { Object.keys(localStorage).forEach(function (k) { if (k === KEY || k === APP_HTML || k === 'bb_photos' || k.indexOf('bb_data:') === 0) localStorage.removeItem(k); }); } catch (e) {} }
   function sess() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function call(fn, args, ok, fail) {
     // The first getAll uses the request the page already started while the app was loading.
