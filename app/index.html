@@ -102,7 +102,9 @@ function boot() {
 var APP_HTML = 'bb_app_html';
 function show(html) {
   var shim = '<script>(' + appShim.toString() + ')(' + JSON.stringify(API_URL) + ',' + JSON.stringify(KEY) + ',' + JSON.stringify(APP_HTML) + ');<\/script>';
-  document.open(); document.write(html.replace(/<head>/i, '<head>' + shim)); document.close();
+  // The app page has no icon or home-screen tags of its own: carry this page's over so the tab icon and home-screen app stay.
+  var keep = [].map.call(document.querySelectorAll('head link[rel~="icon"], head link[rel="apple-touch-icon"], head link[rel="manifest"], head meta[name="theme-color"], head meta[name^="apple-mobile-web-app"], head meta[name="mobile-web-app-capable"]'), function (el) { var c = el.cloneNode(); if (c.href) c.setAttribute('href', el.href); return c.outerHTML; }).join('');
+  document.open(); document.write(html.replace(/<head>/i, '<head>' + keep + shim)); document.close();
 }
 
 // Runs inside the loaded app: stands in for Apps Script's google.script.run.
