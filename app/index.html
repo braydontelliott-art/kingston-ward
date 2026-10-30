@@ -88,7 +88,8 @@ function boot() {
   window.__BB_BOOT.catch(function () {});
   // Fast start: open the copy of the app saved on this device; the app quietly fetches a fresh copy for next time.
   var saved = read(APP_HTML);
-  if (saved) return show(saved);
+  // Swap the page only after it has finished loading: replacing it mid-load adds the app under this sign-in card instead.
+  if (saved) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { show(saved); }); else show(saved); return; }
   card('<div class="spin"></div><p class="small">Loading…</p>');
   post({ fn: 'app', session: s }).then(function (j) {
     if (!j.ok) { if (j.auth) { store(KEY, null); return signInScreen(); } throw new Error(j.error); }
