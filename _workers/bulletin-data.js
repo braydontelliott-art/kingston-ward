@@ -6,7 +6,7 @@ const UNITS = {
 };
 const FRESH_MS = 60000, KEEP_SECONDS = 7 * 86400;
 const HEADERS = { 'Content-Type': 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=30', 'X-Robots-Tag': 'noindex' };
-const RETRY_MS = 15000, lastTry = {};
+const RETRY_MS = 15000, lastTry = {}, inFlight = {};
 
 async function fromScript(unit) {
   const r = await fetch(UNITS[unit], { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'publicBulletin' }), redirect: 'follow' });
@@ -14,8 +14,15 @@ async function fromScript(unit) {
   if (!r.ok || !d || d.ok !== true) throw new Error('Bad answer from Apps Script');
   return text;
 }
+// Requests that arrive together share one Apps Script call, so a first burst with no copy yet can't swamp it.
+function shared(unit, key, cache) {
+  if (!inFlight[unit]) inFlight[unit] = refresh(unit, key, cache).finally(() => { inFlight[unit] = null; });
+  return inFlight[unit];
+}
 async function refresh(unit, key, cache) {
-  const text = await fromScript(unit);
+  let text;
+  try { text = await fromScript(unit); }
+  catch (e) { await new Promise(res => setTimeout(res, 1500)); text = await fromScript(unit); }
   await cache.put(key, new Response(text, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=' + KEEP_SECONDS, 'X-Fetched-At': String(Date.now()) } }));
   return text;
 }
@@ -25,16 +32,16 @@ export default {
     if (request.method !== 'GET') return new Response('Not allowed', { status: 405 });
     const url = new URL(request.url), unit = url.pathname.replace(/^\/|\/$/g, '');
     if (!Object.prototype.hasOwnProperty.call(UNITS, unit)) return new Response('Not found', { status: 404, headers: { 'X-Robots-Tag': 'noindex' } });
-    const cache = caches.default, key = new Request(url.origin + '/__copy/' + unit), hit = await cache.match(key);
+    const cache = caches.default, key = new Request(url.origin + '/__copy/v2/' + unit), hit = await cache.match(key);
     if (hit) {
       const body = await hit.text(), age = Date.now() - Number(hit.headers.get('X-Fetched-At') || 0);
       if (age >= FRESH_MS && Date.now() - (lastTry[unit] || 0) >= RETRY_MS) {
         lastTry[unit] = Date.now();
-        ctx.waitUntil(refresh(unit, key, cache).catch(() => {}));
+        ctx.waitUntil(shared(unit, key, cache).catch(() => {}));
       }
       return new Response(body, { headers: HEADERS });
     }
-    try { return new Response(await refresh(unit, key, cache), { headers: HEADERS }); }
+    try { return new Response(await shared(unit, key, cache), { headers: HEADERS }); }
     catch (e) { return new Response(JSON.stringify({ ok: false, error: 'unavailable' }), { status: 503, headers: Object.assign({}, HEADERS, { 'Cache-Control': 'no-store' }) }); }
   }
 };
