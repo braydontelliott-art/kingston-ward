@@ -45,6 +45,8 @@ p{color:var(--muted);margin:0 0 22px}
 var API_URL = 'https://script.google.com/macros/s/AKfycbwHhe6NFkzuVRytUj_SZupoUX4XBD3FkGrtdTtSuHQF-0BWBrGGsFc4x9CNJjLQ9tgp/exec';   // Ward Events web app (runs as the owner)
 var CLIENT_ID = '781984210146-toor95vmf1716m7qefm9utperhj0n56u.apps.googleusercontent.com';
 var KEY = 'we_session';
+// Same site as the Bishopric Board (/app/): if this device is signed in there, use that instead of a second Google sign-in.
+var BOARD_API = 'https://script.google.com/macros/s/AKfycbxTmstrn1ETmsEnobIx9-MB12Mw8LCsdHlzGO41-UxkxitVuE224xnl8wTXhK3BlzRo/exec', BOARD_KEY = 'bb_session';
 
 function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
 function read(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -90,6 +92,14 @@ function boot() {
   if (RETURN_TOKEN) { var t = RETURN_TOKEN; RETURN_TOKEN = ''; return onCredential({ credential: t }); }
   if (RETURN_ERR) { var m = RETURN_ERR; RETURN_ERR = ''; return signInScreen(m); }
   var s = read(KEY);
+  if (!s && read(BOARD_KEY) && !boot.triedBoard) {
+    boot.triedBoard = true;
+    card('<div class="spin"></div><p class="small">Signing in…</p>');
+    return fetch(BOARD_API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'eventsHandoff', session: read(BOARD_KEY) }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { var m = j.ok && /handoff=([^&]+)/.exec(j.result.url || ''); if (!m) return signInScreen(); HANDOFF = decodeURIComponent(m[1]); boot(); })
+      .catch(function () { signInScreen(); });
+  }
   if (!s) return signInScreen();
   card('<div class="spin"></div><p class="small">Loading…</p>');
   post({ fn: 'app', session: s }).then(function (j) {
