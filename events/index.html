@@ -57,11 +57,12 @@ function iosStandalone() { return window.navigator.standalone === true; }
 
 // Returning from Google's full-page sign-in (iPhone home-screen app): Google sends the ID token straight
 // back to this page in the URL fragment — no stop on script.google.com.
-var RETURN_TOKEN = '', RETURN_ERR = '';
+var RETURN_TOKEN = '', RETURN_ERR = '', HANDOFF = '';
 (function () {
   var h = location.hash.replace(/^#/, ''); if (!h) return;
   var p = {}; h.split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); });
   if (p.session) store(KEY, p.session);
+  if (p.handoff) HANDOFF = p.handoff;   // opened from the Bishopric Board: one-time pass, no second sign-in
   if (p.id_token) { if (p.state && p.state === read('we_state')) RETURN_TOKEN = p.id_token; else RETURN_ERR = 'Sign-in didn’t match. Please try again.'; }
   if (p.error && p.error !== 'access_denied') RETURN_ERR = 'Google sign-in didn’t go through. Please try again.';
   store('we_state', null);
@@ -78,6 +79,14 @@ function fullPageSignIn() {
 function useFullPage() { return iosStandalone() || /[?&]fullpage=1/.test(location.search); }
 
 function boot() {
+  if (HANDOFF) {
+    var code = HANDOFF; HANDOFF = '';
+    card('<div class="spin"></div><p class="small">Signing in…</p>');
+    return post({ fn: 'handoff', code: code }).then(function (j) {
+      if (!j.ok) return signInScreen(j.error);
+      store(KEY, j.result.session); if (j.result.email) store('we_email', j.result.email); boot();
+    }).catch(function () { signInScreen('Couldn’t reach the server. Try again.'); });
+  }
   if (RETURN_TOKEN) { var t = RETURN_TOKEN; RETURN_TOKEN = ''; return onCredential({ credential: t }); }
   if (RETURN_ERR) { var m = RETURN_ERR; RETURN_ERR = ''; return signInScreen(m); }
   var s = read(KEY);
