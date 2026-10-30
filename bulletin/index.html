@@ -71,9 +71,14 @@ h2{margin:0 0 14px;font-family:var(--serif);font-weight:400;font-size:30px}
 footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom));font-size:13px;color:var(--muted)}
 .status{padding:48px 24px;color:var(--muted)}
 .skel{background:var(--line);border-radius:8px;height:18px;margin:10px 0}
-.art{margin:-8px 0 0;border-radius:18px;overflow:hidden;background:rgba(255,255,255,.08)}
-.art[hidden]{display:none}
-.art img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;object-position:center 20%}
+.hero{position:relative;overflow:hidden}
+.hero > *{position:relative}
+.hero-art{position:absolute !important;top:0;right:0;width:70%;height:100%;object-fit:cover;object-position:center 15%;opacity:.55;pointer-events:none;
+  -webkit-mask-image:linear-gradient(to left,#000 25%,transparent 100%);mask-image:linear-gradient(to left,#000 25%,transparent 100%)}
+.hero-art[hidden]{display:none}
+.hero-title{max-width:250px}
+.art-credit{margin-top:14px;font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ground-soft)}
+.art-credit:empty{display:none}
 .weeks{display:flex;gap:8px;margin:20px 16px 0;padding:4px;background:var(--line);border-radius:14px}
 .wk{flex:1;min-height:52px;border:0;border-radius:10px;background:transparent;color:var(--muted);font:500 13px var(--sans);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 8px}
 .wk .wk-d{font-size:15px;font-weight:700;color:var(--ink)}
@@ -90,12 +95,12 @@ a.hymn-link .ext{display:inline-block;vertical-align:4px;margin-left:6px;color:v
 <div class="wrap">
   <header class="hero">
     <div class="ward" id="ward">Kingston Ward</div>
-    <div>
+    <img class="hero-art" id="heroArt" alt="" hidden>
+    <div class="hero-title">
       <div class="when" id="when">&nbsp;</div>
       <h1 id="title">Sacrament meeting</h1>
+      <div class="art-credit" id="artCredit"></div>
     </div>
-    <!-- Picture of the Savior: save the chosen image as bulletin/christ.jpg. If the file is missing, this stays hidden. -->
-    <figure class="art" id="art" hidden><img src="christ.jpg" alt="Jesus Christ" onload="this.parentNode.hidden=false" onerror="this.parentNode.remove()"></figure>
   </header>
   <main id="main"><div class="status"><div class="skel" style="width:60%"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:40%"></div></div></main>
   <footer>kwbishopric.org/bulletin</footer>
@@ -244,6 +249,22 @@ function titleHtml(t) {
   // Italicize "testimony" in the fast-meeting title, as in the design; everything else plain.
   return esc(t).replace(/\btestimony\b/i, function (m) { return '<em>' + m + '</em>'; });
 }
+/* Weekly artwork of the Savior. Each Sunday shows the next painting in this list, in order, so every week differs
+   once the list has more than one. Add a painting: put a ~800px-wide JPG in bulletin/art/ and add a line here. */
+var ART = [
+  { file: 'art/jesus-the-christ-parson.jpg', title: 'Jesus the Christ', artist: 'Del Parson' }
+];
+function artFor(ymd) {
+  if (!ART.length || !ymd) return null;
+  var weeks = Math.floor(ymdDate(ymd).getTime() / (7 * 864e5));
+  return ART[((weeks % ART.length) + ART.length) % ART.length];
+}
+function showArt(ymd) {
+  var a = artFor(ymd), img = $('heroArt'), cr = $('artCredit');
+  if (!a) { img.hidden = true; cr.textContent = ''; return; }
+  if (img.getAttribute('src') !== a.file) { img.hidden = true; img.onload = function () { img.hidden = false; }; img.onerror = function () { img.hidden = true; }; img.src = a.file; }
+  cr.textContent = a.title + (a.artist ? ' · ' + a.artist : '');
+}
 function fmtTab(ymd) { return ymdDate(ymd).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); }
 var STATE = { d: null, raw: null, week: 0 };
 function render(raw) {
@@ -273,6 +294,7 @@ function paint() {
   } else {
     $('when').textContent = (m.date ? fmtLongDay(m.date) : '') + (m.time ? ' · ' + m.time : '');
     $('title').innerHTML = titleHtml(m.title);
+    showArt(m.date);
     if (m.note) h += '<p class="status">' + esc(m.note) + '</p>';
     if (m.roles.length) {
       h += '<section class="people" aria-label="Meeting leaders">' + m.roles.map(function (r) {
