@@ -83,6 +83,9 @@ function boot() {
   if (RETURN_ERR) { var m = RETURN_ERR; RETURN_ERR = ''; return signInScreen(m); }
   var s = read(KEY);
   if (!s) return signInScreen();
+  // Start downloading the data now, alongside the app, instead of after it loads (the app picks this request up).
+  window.__BB_BOOT = post({ fn: 'getAll', args: [], session: s });
+  window.__BB_BOOT.catch(function () {});
   // Fast start: open the copy of the app saved on this device; the app quietly fetches a fresh copy for next time.
   var saved = read(APP_HTML);
   if (saved) return show(saved);
@@ -107,8 +110,10 @@ function appShim(API, KEY, APP_HTML) {
   function wipe() { try { Object.keys(localStorage).forEach(function (k) { if (k === KEY || k === APP_HTML || k.indexOf('bb_data:') === 0) localStorage.removeItem(k); }); } catch (e) {} }
   function sess() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function call(fn, args, ok, fail) {
-    fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args, session: sess() }) })
-      .then(function (r) { return r.json(); })
+    // The first getAll uses the request the page already started while the app was loading.
+    var early = fn === 'getAll' && window.__BB_BOOT; if (early) window.__BB_BOOT = null;
+    (early || fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args, session: sess() }) })
+      .then(function (r) { return r.json(); }))
       .then(function (j) {
         if (j.ok) { if (ok) ok(j.result); return; }
         if (j.auth) { wipe(); location.reload(); return; }
