@@ -77,7 +77,8 @@ footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom)
   -webkit-mask-image:linear-gradient(to left,#000 25%,transparent 100%);mask-image:linear-gradient(to left,#000 25%,transparent 100%)}
 .hero-art[hidden]{display:none}
 .hero-title{max-width:250px}
-.art-credit{margin-top:14px;font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ground-soft)}
+.art-credit{margin-top:12px;font-size:12px;line-height:1.35;letter-spacing:.01em;color:var(--ground-soft)}
+.art-credit em{font-family:var(--serif);font-size:13px}
 .art-credit:empty{display:none}
 .weeks{display:flex;gap:8px;margin:20px 16px 0;padding:4px;background:var(--line);border-radius:14px}
 .wk{flex:1;min-height:52px;border:0;border-radius:10px;background:transparent;color:var(--muted);font:500 13px var(--sans);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 8px}
@@ -252,7 +253,20 @@ function titleHtml(t) {
 /* Weekly artwork of the Savior. Each Sunday shows the next painting in this list, in order, so every week differs
    once the list has more than one. Add a painting: put a ~800px-wide JPG in bulletin/art/ and add a line here. */
 var ART = [
-  { file: 'art/jesus-the-christ-parson.jpg', title: 'Jesus the Christ', artist: 'Del Parson' }
+  { file: 'art/jesus-the-christ-parson.jpg', title: 'Jesus the Christ', artist: 'Del Parson', pos: 'center 15%' },
+  { file: 'art/in-remembrance-of-me.jpg', title: 'In Remembrance of Me', artist: 'Walter Rane', pos: '60% 30%' },
+  { file: 'art/the-lost-lamb.jpg', title: 'The Lost Lamb', artist: 'Del Parson', pos: 'center 20%' },
+  { file: 'art/living-water.jpg', title: 'Living Water', artist: 'Simon Dewey', pos: '35% 35%' },
+  { file: 'art/christ-and-the-children.jpg', title: 'Christ and the Children', artist: 'Harry Anderson', pos: '38% 40%' },
+  { file: 'art/sermon-on-the-mount.jpg', title: 'The Sermon on the Mount', artist: 'Carl Heinrich Bloch', pos: '55% 20%' },
+  { file: 'art/divine-redeemer-dewey.jpg', title: 'Divine Redeemer', artist: 'Simon Dewey', pos: 'center 20%' },
+  { file: 'art/washing-the-apostles-feet.jpg', title: 'Jesus Washing the Apostles’ Feet', artist: 'Del Parson', pos: '35% 60%' },
+  { file: 'art/mary-and-martha.jpg', title: 'Christ in the Home of Mary and Martha', artist: 'David Lindsley', pos: '80% 40%' },
+  { file: 'art/christ-bethesda.jpg', title: 'Christ and Man at Bethesda', artist: 'Bible Videos', pos: '0% 40%' },
+  { file: 'art/jesus-at-the-door.jpg', title: 'Jesus at the Door', artist: 'Del Parson', pos: '30% 35%' },
+  { file: 'art/jairus-daughter.jpg', title: 'Jesus Blessing Jairus’s Daughter', artist: 'Greg K. Olsen', pos: '25% 30%' },
+  { file: 'art/behold-my-hands.jpg', title: 'Behold My Hands and Feet', artist: 'Harry Anderson', pos: '50% 30%' },
+  { file: 'art/the-ascension.jpg', title: 'The Ascension', artist: 'Harry Anderson', pos: '60% 20%' }
 ];
 function artFor(ymd) {
   if (!ART.length || !ymd) return null;
@@ -263,7 +277,8 @@ function showArt(ymd) {
   var a = artFor(ymd), img = $('heroArt'), cr = $('artCredit');
   if (!a) { img.hidden = true; cr.textContent = ''; return; }
   if (img.getAttribute('src') !== a.file) { img.hidden = true; img.onload = function () { img.hidden = false; }; img.onerror = function () { img.hidden = true; }; img.src = a.file; }
-  cr.textContent = a.title + (a.artist ? ' · ' + a.artist : '');
+  img.style.objectPosition = a.pos || 'center 15%';
+  cr.innerHTML = '<em>' + esc(a.title) + '</em>' + (a.artist ? ' · ' + esc(a.artist) : '');
 }
 function fmtTab(ymd) { return ymdDate(ymd).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); }
 var STATE = { d: null, raw: null, week: 0 };
