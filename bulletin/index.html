@@ -71,6 +71,19 @@ h2{margin:0 0 14px;font-family:var(--serif);font-weight:400;font-size:30px}
 footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom));font-size:13px;color:var(--muted)}
 .status{padding:48px 24px;color:var(--muted)}
 .skel{background:var(--line);border-radius:8px;height:18px;margin:10px 0}
+.art{margin:-8px 0 0;border-radius:18px;overflow:hidden;background:rgba(255,255,255,.08)}
+.art[hidden]{display:none}
+.art img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;object-position:center 20%}
+.weeks{display:flex;gap:8px;margin:20px 16px 0;padding:4px;background:var(--line);border-radius:14px}
+.wk{flex:1;min-height:52px;border:0;border-radius:10px;background:transparent;color:var(--muted);font:500 13px var(--sans);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 8px}
+.wk .wk-d{font-size:15px;font-weight:700;color:var(--ink)}
+.wk[aria-selected="true"]{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.12);color:var(--ink)}
+.wk:focus-visible{outline:3px solid var(--btn-bg);outline-offset:2px}
+.weeks + .people{padding-top:20px}
+a.hymn-link{text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:4px;text-decoration-thickness:1px}
+a.hymn-link:hover{text-decoration-color:currentColor}
+a.hymn-link .ext{display:inline-block;vertical-align:4px;margin-left:6px;color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -81,6 +94,8 @@ footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom)
       <div class="when" id="when">&nbsp;</div>
       <h1 id="title">Sacrament meeting</h1>
     </div>
+    <!-- Picture of the Savior: save the chosen image as bulletin/christ.jpg. If the file is missing, this stays hidden. -->
+    <figure class="art" id="art" hidden><img src="christ.jpg" alt="Jesus Christ" onload="this.parentNode.hidden=false" onerror="this.parentNode.remove()"></figure>
   </header>
   <main id="main"><div class="status"><div class="skel" style="width:60%"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:40%"></div></div></main>
   <footer>kwbishopric.org/bulletin</footer>
@@ -101,7 +116,11 @@ var SAMPLE = {
     openingHymn: '#138 Bless Our Fast, We Pray', sacramentHymn: '#191 Behold the Great Redeemer Die', intermediateHymn: '', musicalNumber: '',
     intermediateAfter: '', closingHymn: '[#] [Hymn title]', invocation: '[Name]', benediction: '[Name]', speakers: '', announcements: ''
   },
-  next: [{ date: '2026-11-08', type: 'Sacrament meeting', speakers: '[Speaker] — [Topic]\n[Speaker]' }],
+  next: [{
+    date: '2026-11-08', type: 'Sacrament meeting', presiding: 'Bishop Burton', conducting: 'Brother Johnson, First Counselor', chorister: 'Jim Manning', organist: 'Meg Naisbitt',
+    openingHymn: '#1001 Come, Thou Fount of Every Blessing', sacramentHymn: "#176 'Tis Sweet to Sing the Matchless Love (Meredith)", intermediateHymn: '#1009 Gethsemane', musicalNumber: '',
+    intermediateAfter: '1', closingHymn: '#2 The Spirit of God', invocation: '[Name]', benediction: '[Name]', speakers: '[Speaker] — [Topic]\n[Speaker] — [Topic]', announcements: ''
+  }],
   events: [
     { title: '[Ward event]', date: '2026-11-07', start: '18:00', end: '20:00', location: '[Place]' },
     { title: '[Stake event]', date: '2026-11-14', start: '', end: '', location: '', stake: true }
@@ -124,12 +143,34 @@ function zonedIso(ymd, hhmm) {
   return new Date(guess + (guess - shown)).toISOString();
 }
 
-/* getBulletinData_() → what the page renders. */
+/* Gospel Library link for a hymn: same title-to-address rule the Church site uses.
+   1–341 are the 1985 hymnbook; 1001+ are Hymns—For Home and Church. */
+function hymnSlug(t) { return String(t || '').toLowerCase().replace(/[’'‘]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+function hymnUrl(number, title) {
+  var n = parseInt(number, 10), s = hymnSlug(title);
+  if (!n || !s) return '';
+  if (n >= 1 && n <= 341) return 'https://www.churchofjesuschrist.org/study/manual/hymns/' + s + '?lang=eng';
+  if (n >= 1000) return 'https://www.churchofjesuschrist.org/study/music/hymns-for-home-and-church/' + s + '?lang=eng';
+  return '';
+}
+
+/* getBulletinData_() → what the page renders. Every published Sunday gets its own full program. */
 function normalize(d) {
-  var m = d.meeting, out = { ward: d.wardName || 'Kingston Ward', meeting: null, announcements: [], next: [], events: [] };
-  if (m) {
+  var out = { ward: d.wardName || 'Kingston Ward', weeks: [], events: [] };
+  [d.meeting].concat(d.next || []).forEach(function (m) { if (m && m.date) out.weeks.push(buildMeeting(m, d.meetingTime)); });
+  out.events = (d.events || []).map(function (e, i) {
+    var ev = { id: (e.date || '') + '-' + slug(e.title), date: e.date, rawTitle: e.title || '', title: e.title || 'Event', location: e.location || '', stake: !!e.stake };
+    if (e.start) { ev.start = zonedIso(e.date, e.start); if (e.end) ev.end = zonedIso(e.date, e.end); }
+    else { ev.start = e.date; ev.allDay = true; }
+    return ev;
+  });
+  return out;
+}
+function buildMeeting(m, time) {
+  var mt;
+  {
     var conf = /Conference/.test(m.type || '') && m.type !== 'Ward Conference', fast = /Fast/.test(m.type || '');
-    var mt = { title: m.type && m.type !== 'Sacrament meeting' ? m.type : 'Sacrament meeting', date: m.date, time: d.meetingTime || '', roles: [], items: [], note: '' };
+    var mt = { title: m.type && m.type !== 'Sacrament meeting' ? m.type : 'Sacrament meeting', date: m.date, time: time || '', roles: [], items: [], note: '' };
     if (conf) mt.note = m.type + ' — no sacrament meeting in the ward building today.';
     else {
       mt.roles = [['Presiding', m.presiding], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
@@ -154,19 +195,9 @@ function normalize(d) {
       if (m.closingHymn) it.push(hymn('Closing hymn', m.closingHymn));
       if (m.benediction) it.push({ type: 'person', label: 'Benediction', name: m.benediction });
     }
-    out.meeting = mt;
-    out.announcements = lines(m.announcements).map(function (a) { return { text: a }; });
+    mt.announcements = lines(m.announcements).map(function (a) { return { text: a }; });
   }
-  out.next = (d.next || []).filter(function (n) { return lines(n.speakers).length || /Fast|Conference/.test(n.type || ''); }).map(function (n) {
-    return { date: n.date, text: /Fast|Conference/.test(n.type || '') && !lines(n.speakers).length ? n.type : lines(n.speakers).map(function (l) { return splitSpeaker(l).n; }).join(', ') };
-  });
-  out.events = (d.events || []).map(function (e, i) {
-    var ev = { id: (e.date || '') + '-' + slug(e.title), date: e.date, rawTitle: e.title || '', title: e.title || 'Event', location: e.location || '', stake: !!e.stake };
-    if (e.start) { ev.start = zonedIso(e.date, e.start); if (e.end) ev.end = zonedIso(e.date, e.end); }
-    else { ev.start = e.date; ev.allDay = true; }
-    return ev;
-  });
-  return out;
+  return mt;
 }
 
 function load() {
@@ -213,11 +244,28 @@ function titleHtml(t) {
   // Italicize "testimony" in the fast-meeting title, as in the design; everything else plain.
   return esc(t).replace(/\btestimony\b/i, function (m) { return '<em>' + m + '</em>'; });
 }
+function fmtTab(ymd) { return ymdDate(ymd).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); }
+var STATE = { d: null, raw: null, week: 0 };
 function render(raw) {
-  var d = normalize(raw), m = d.meeting;
+  var d = normalize(raw);
+  STATE.d = d; STATE.raw = raw;
+  var want = (location.hash.match(/^#(\d{4}-\d{2}-\d{2})$/) || [])[1], w = 0;
+  d.weeks.forEach(function (x, i) { if (x.date === want) w = i; });
+  STATE.week = w;
   $('ward').textContent = d.ward;
   document.title = d.ward + ' · Bulletin';
+  paint();
+}
+function paint() {
+  var d = STATE.d, raw = STATE.raw, m = d.weeks[STATE.week];
   var h = '';
+  if (d.weeks.length > 1) {
+    h += '<nav class="weeks" role="tablist" aria-label="Choose a Sunday">' + d.weeks.map(function (x, i) {
+      var sel = i === STATE.week;
+      return '<button type="button" role="tab" class="wk" data-week="' + i + '" aria-selected="' + sel + '"' + (sel ? '' : ' tabindex="-1"') + '>' +
+        '<span class="wk-k">' + (i === 0 ? 'This Sunday' : i === 1 ? 'Next Sunday' : 'Later') + '</span><span class="wk-d">' + esc(fmtTab(x.date)) + '</span></button>';
+    }).join('') + '</nav>';
+  }
   if (!m) {
     $('when').textContent = raw.meetingTime ? 'Sundays · ' + raw.meetingTime : '';
     $('title').innerHTML = 'Sacrament meeting';
@@ -234,8 +282,10 @@ function render(raw) {
     if (m.items.length) {
       h += '<ol class="program" aria-label="Order of meeting">' + m.items.map(function (it) {
         if (it.type === 'hymn') {
-          var no = it.number ? ' · No. ' + esc(it.number) : '';
-          return '<li><span class="lbl">' + esc(it.label) + no + '</span><span class="hymn">' + esc(it.title) + '</span></li>';
+          var no = it.number ? ' · No. ' + esc(it.number) : '', url = hymnUrl(it.number, it.title);
+          var title = url ? '<a class="hymn hymn-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(it.title) + LINK_ICON + '</a>'
+            : '<span class="hymn">' + esc(it.title) + '</span>';
+          return '<li><span class="lbl">' + esc(it.label) + no + '</span>' + title + '</li>';
         }
         if (it.type === 'talk') {
           return '<li><span class="lbl">' + esc(it.label) + '</span><span class="hymn">' + esc(it.name) + '</span>' + (it.topic ? '<span class="topic">' + esc(it.topic) + '</span>' : '') + '</li>';
@@ -247,8 +297,9 @@ function render(raw) {
       }).join('') + '</ol>';
     }
   }
-  if (d.announcements.length) {
-    h += '<section class="notes" aria-labelledby="ann-h"><h2 id="ann-h">Announcements</h2>' + d.announcements.map(function (a) {
+  var ann = m ? m.announcements || [] : [];
+  if (ann.length) {
+    h += '<section class="notes" aria-labelledby="ann-h"><h2 id="ann-h">Announcements</h2>' + ann.map(function (a) {
       return '<p>' + esc(a.text) + '</p>';
     }).join('') + '</section>';
   }
@@ -266,13 +317,16 @@ function render(raw) {
       '</div></div></div>';
   }).join('');
   h += '</section>';
-  if (d.next.length) {
-    h += '<section class="up" aria-labelledby="nx-h"><h2 id="nx-h">In the weeks ahead</h2>' + d.next.map(function (n) {
-      return '<div class="ev"><div><div class="name">' + esc(fmtLongDay(n.date)) + '</div><div class="meta">' + esc(n.text) + '</div></div></div>';
-    }).join('') + '</section>';
-  }
   $('main').innerHTML = h;
 }
+function pickWeek(i, focus) {
+  if (i < 0 || i >= STATE.d.weeks.length || i === STATE.week) return;
+  STATE.week = i;
+  try { history.replaceState(null, '', i === 0 ? location.pathname + location.search : '#' + STATE.d.weeks[i].date); } catch (e) {}
+  paint();
+  if (focus) { var b = document.querySelector('.wk[data-week="' + i + '"]'); if (b) b.focus(); }
+}
+var LINK_ICON = '<svg class="ext" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg><span class="sr">(opens in Gospel Library)</span>';
 
 /* ---- add-to-calendar menus ---- */
 function closeMenus(except) {
@@ -282,6 +336,8 @@ function closeMenus(except) {
   });
 }
 document.addEventListener('click', function (e) {
+  var wk = e.target.closest && e.target.closest('.wk');
+  if (wk) { pickWeek(+wk.getAttribute('data-week')); window.scrollTo({ top: 0 }); return; }
   var b = e.target.closest && e.target.closest('.add');
   if (b) {
     var m = b.parentNode.querySelector('.menu'), open = !m.classList.contains('open');
@@ -292,7 +348,12 @@ document.addEventListener('click', function (e) {
   if (e.target.closest && e.target.closest('.menu a')) { setTimeout(closeMenus, 0); return; }
   closeMenus();
 });
-document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(); });
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') closeMenus();
+  if (e.target.classList && e.target.classList.contains('wk') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    pickWeek(STATE.week + (e.key === 'ArrowRight' ? 1 : -1), true); e.preventDefault();
+  }
+});
 
 load().then(function (d) {
   if (!d || d.ok === false || d.error) throw new Error((d && d.error) || 'unavailable');
