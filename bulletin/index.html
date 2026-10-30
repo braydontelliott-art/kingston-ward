@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="robots" content="noindex">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kingston Ward · Bulletin</title>
 <meta name="description" content="This week's sacrament meeting program and upcoming events for the Kingston Ward.">
@@ -114,8 +115,11 @@ a.hymn-link .ext{display:inline-block;vertical-align:4px;margin-left:6px;color:v
 
 <script>
 /* Kingston Ward · public bulletin.
-   Reads the bulletin from the "App API" deployment with fn "publicBulletin" — no sign-in.
-   That endpoint returns only what is already public on the printed program. */
+   Built for a whole congregation opening it at once. In order: the copy saved on this phone shows right away, then
+   DATA_URL (a Cloudflare Worker, see _workers/) updates it. Only if that fails does the phone call Apps Script directly, with
+   staggered retries, because Apps Script turns away most requests when hundreds arrive together.
+   All of these return only what is already public on the printed program (fn "publicBulletin", no sign-in). */
+var DATA_URL = 'https://data.mywardy.com/kingston';
 var API_URL = 'https://script.google.com/macros/s/AKfycbxTmstrn1ETmsEnobIx9-MB12Mw8LCsdHlzGO41-UxkxitVuE224xnl8wTXhK3BlzRo/exec';
 var TZ = 'America/Denver';
 
@@ -123,12 +127,12 @@ var TZ = 'America/Denver';
 var SAMPLE = {
   wardName: 'Kingston Ward', meetingTime: '11:30 AM', today: '2026-10-28',
   meeting: {
-    date: '2026-11-01', type: 'Fast & testimony meeting', presiding: '', conducting: 'Ken', chorister: 'Jim Manning', organist: 'Meg Naisbitt',
+    date: '2026-11-01', type: 'Fast & testimony meeting', presiding: '', conducting: 'Bishop Sample', chorister: 'Sister Example', organist: 'Brother Example',
     openingHymn: '#138 Bless Our Fast, We Pray', sacramentHymn: '#191 Behold the Great Redeemer Die', intermediateHymn: '', musicalNumber: '',
     intermediateAfter: '', closingHymn: '[#] [Hymn title]', invocation: '[Name]', benediction: '[Name]', speakers: '', announcements: ''
   },
   next: [{
-    date: '2026-11-08', type: 'Sacrament meeting', presiding: 'Bishop Burton', conducting: 'Brother Johnson, First Counselor', chorister: 'Jim Manning', organist: 'Meg Naisbitt',
+    date: '2026-11-08', type: 'Sacrament meeting', presiding: 'Bishop Sample', conducting: 'Brother Sample, First Counselor', chorister: 'Sister Example', organist: 'Brother Example',
     openingHymn: '#1001 Come, Thou Fount of Every Blessing', sacramentHymn: "#176 'Tis Sweet to Sing the Matchless Love (Meredith)", intermediateHymn: '#1009 Gethsemane', musicalNumber: '',
     intermediateAfter: '1', closingHymn: '#2 The Spirit of God', invocation: '[Name]', benediction: '[Name]', speakers: '[Speaker] — [Topic]\n[Speaker] — [Topic]', announcements: ''
   }],
@@ -235,11 +239,26 @@ function buildMeeting(m, time) {
   return mt;
 }
 
-function load() {
-  if (/[?&]sample\b/.test(location.search)) return Promise.resolve(SAMPLE);
-  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'publicBulletin' }) })
-    .then(function (r) { return r.json(); });
+function pause(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+function fetchJson(url, opts, ms) {
+  var ctl = window.AbortController ? new AbortController() : null, t = ctl && setTimeout(function () { ctl.abort(); }, ms);
+  return fetch(url, Object.assign({ signal: ctl ? ctl.signal : undefined }, opts)).then(function (r) { return r.json(); }).then(function (d) {
+    if (t) clearTimeout(t);
+    if (!d || d.ok === false || d.error) throw new Error((d && d.error) || 'unavailable');
+    return d;
+  });
 }
+// Apps Script directly, spread out so a full chapel doesn't all retry in the same moment.
+function direct(left, wait) {
+  return pause(Math.random() * wait).then(function () {
+    return fetchJson(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: 'publicBulletin' }) }, 20000);
+  }).catch(function (e) { if (left <= 0) throw e; return direct(left - 1, wait * 2); });
+}
+function load() { return fetchJson(DATA_URL, {}, 6000).catch(function () { return direct(3, 3000); }); }
+var SAVE_KEY = 'bulletin_kingston';
+function readSaved() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return null; } }
+function writeSaved(d) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(d)); } catch (e) {} }
+function todayHere() { return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date()); }
 
 /* ---- dates ---- */
 function ymdDate(ymd) { var p = ymd.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2], 12)); }
@@ -450,12 +469,18 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
-load().then(function (d) {
-  if (!d || d.ok === false || d.error) throw new Error((d && d.error) || 'unavailable');
-  render(d);
-}).catch(function () {
-  $('main').innerHTML = '<p class="status">The bulletin isn’t available right now. Please check back in a few minutes.</p>';
-});
+if (/[?&]sample\b/.test(location.search)) render(SAMPLE);
+else {
+  // Show the saved copy first, unless its Sunday has passed. An old program is worse than a short wait.
+  var saved = readSaved(), shown = !!(saved && saved.meeting && saved.meeting.date >= todayHere());
+  if (shown) render(saved);
+  load().then(function (d) {
+    writeSaved(d);
+    if (!shown || JSON.stringify(d) !== JSON.stringify(saved)) render(d);
+  }).catch(function () {
+    if (!shown) $('main').innerHTML = '<p class="status">The bulletin isn’t available right now. Please check back in a few minutes.</p>';
+  });
+}
 </script>
 </body>
 </html>
