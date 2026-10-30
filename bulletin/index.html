@@ -268,9 +268,35 @@ var ART = [
   { file: 'art/behold-my-hands.jpg', title: 'Behold My Hands and Feet', artist: 'Harry Anderson', pos: '50% 30%' },
   { file: 'art/the-ascension.jpg', title: 'The Ascension', artist: 'Harry Anderson', pos: '60% 20%' }
 ];
+/* Holiday Sundays get their own painting instead of the next one in the rotation. Dates are worked out every year. */
+var HOLIDAY_ART = {
+  palm:    { file: 'art/triumphal-entry.jpg', title: 'Christ Rides into Jerusalem', artist: 'Bible Videos', pos: '50% 30%' },
+  easter:  { file: 'art/he-is-risen.jpg', title: 'He Is Risen', artist: 'Del Parson', pos: 'center 10%' },
+  advent:  { file: 'art/road-to-bethlehem.jpg', title: 'The Road to Bethlehem', artist: 'Joseph Brickey', pos: '65% 50%' },
+  christmas: { file: 'art/birth-of-jesus.jpg', title: 'The Birth of Jesus', artist: '', pos: '50% 55%' }
+};
+// Western Easter (Anonymous Gregorian algorithm) → 'yyyy-MM-dd'.
+function easterOf(y) {
+  var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  var h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  var mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(da).padStart(2, '0');
+}
+function holidayFor(ymd) {
+  var y = +ymd.slice(0, 4), md = ymd.slice(5), easter = easterOf(y);
+  var palm = new Date(ymdDate(easter).getTime() - 7 * 864e5).toISOString().slice(0, 10);
+  if (ymd === easter) return HOLIDAY_ART.easter;
+  if (ymd === palm) return HOLIDAY_ART.palm;
+  if (md >= '12-19' && md <= '12-25') return HOLIDAY_ART.christmas;   // the Sunday before Christmas, or Christmas Day
+  if (md >= '12-12' && md <= '12-18') return HOLIDAY_ART.advent;      // the Sunday before that
+  return null;
+}
 function artFor(ymd) {
-  if (!ART.length || !ymd) return null;
-  var weeks = Math.floor(ymdDate(ymd).getTime() / (7 * 864e5));
+  if (!ymd) return null;
+  var hol = holidayFor(ymd); if (hol) return hol;
+  if (!ART.length) return null;
+  // Counted from Sunday, Nov 1, 2026 (the first painting in the list).
+  var weeks = Math.round((ymdDate(ymd).getTime() - ymdDate('2026-11-01').getTime()) / (7 * 864e5));
   return ART[((weeks % ART.length) + ART.length) % ART.length];
 }
 function showArt(ymd) {
