@@ -192,11 +192,16 @@ function buildMeeting(m, time) {
   var mt;
   {
     var conf = /Conference/.test(m.type || '') && m.type !== 'Ward Conference', fast = /Fast/.test(m.type || '');
-    var mt = { title: m.type && m.type !== 'Sacrament meeting' ? m.type : 'Sacrament meeting', date: m.date, time: time || '', roles: [], items: [], note: '' };
-    if (conf) mt.note = m.type + ' — no sacrament meeting in the ward building today.';
+    var primary = /Primary Program/i.test(m.type || ''), other = m.type === 'Other';
+    var mt = { title: other ? 'Special meeting' : m.type && m.type !== 'Sacrament meeting' ? m.type : 'Sacrament meeting', date: m.date, time: time || '', roles: [], items: [], note: '' };
+    if (conf) { mt.time = ''; mt.note = m.type + ' — no sacrament meeting in the ward building today.'; }
     else {
-      mt.roles = [['Presiding', m.presiding || DEFAULT_PRESIDING], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
+      // A member of the stake presidency usually presides at ward conference, so only the bishop's regular Sundays default to him.
+      var presiding = m.presiding || (other || m.type === 'Ward Conference' ? '' : DEFAULT_PRESIDING);
+      mt.roles = [['Presiding', presiding], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
         .map(function (r) { return { label: r[0], name: r[1] || TBD, tbd: !r[1] }; });
+      // Same person presiding and conducting: one line, not two.
+      if (!mt.roles[0].tbd && mt.roles[0].name === mt.roles[1].name) mt.roles.splice(0, 2, { label: 'Presiding & conducting', name: mt.roles[0].name, tbd: false });
       var it = mt.items;
       it.push(hymnOrTbd('Opening hymn', m.openingHymn));
       it.push(personOrTbd('Invocation', m.invocation));
@@ -207,16 +212,23 @@ function buildMeeting(m, time) {
       if (fast) it.push({ type: 'part', text: 'Bearing of testimonies' });
       else {
         var sp = lines(m.speakers), after = Math.max(1, parseInt(m.intermediateAfter, 10) || 2), placed = false;
+        if (primary) it.push({ type: 'part', text: 'Presented by the Primary children' });
         sp.forEach(function (l, i) {
           var s = splitSpeaker(l);
           it.push({ type: 'talk', label: i === sp.length - 1 && sp.length > 1 ? 'Concluding speaker' : 'Speaker', name: s.n, topic: s.t });
           if (music && !placed && i + 1 === after && i < sp.length - 1) { it.push(music); placed = true; }
         });
         if (music && !placed) it.push(music);
-        if (!sp.length) it.push({ type: 'talk', label: 'Speakers', name: TBD, topic: '', tbd: true });
+        if (!sp.length && !primary) it.push({ type: 'talk', label: 'Speakers', name: TBD, topic: '', tbd: true });
       }
       it.push(hymnOrTbd('Closing hymn', m.closingHymn));
       it.push(personOrTbd('Benediction', m.benediction));
+      // "Other" has no set format: show only what was entered.
+      if (other) {
+        mt.roles = mt.roles.filter(function (r) { return !r.tbd; });
+        mt.items = mt.items.filter(function (x) { return !x.tbd && x.type !== 'part'; });
+        mt.pending = !mt.roles.length && !mt.items.length;
+      }
     }
     mt.announcements = lines(m.announcements).map(function (a) { return { text: a }; });
   }
