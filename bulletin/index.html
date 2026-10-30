@@ -37,9 +37,8 @@
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.4}
 a{color:inherit}
-/* Wardy frame: the ward's own look stays up front; Wardy is only this top bar and the footer wordmark. */
-body::before{content:"";display:block;height:4px;background:var(--brand)}
-.wrap{max-width:560px;margin:0 auto;min-height:calc(100vh - 4px);display:flex;flex-direction:column}
+/* The ward's own look stays up front; Wardy is only the small footer wordmark. */
+.wrap{max-width:560px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
 .hero{background:var(--ground);color:var(--ground-ink);padding:calc(28px + env(safe-area-inset-top)) 24px 36px;display:flex;flex-direction:column;gap:48px}
 .ward{font-size:15px;font-weight:600;letter-spacing:.01em}
 .when{font-size:14px;color:var(--ground-soft)}
