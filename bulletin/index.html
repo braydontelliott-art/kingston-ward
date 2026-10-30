@@ -90,6 +90,7 @@ a.hymn-link{text-decoration:underline;text-decoration-color:var(--line-2);text-u
 a.hymn-link:hover{text-decoration-color:currentColor}
 a.hymn-link .ext{display:inline-block;vertical-align:4px;margin-left:6px;color:var(--muted)}
 .tbd{color:var(--muted) !important;font-style:italic;font-weight:400 !important}
+.status.pending{margin:20px 16px 0;padding:28px 20px;background:var(--card);border-radius:18px;font-family:var(--serif);font-style:italic;font-size:22px;line-height:1.25;color:var(--soft)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
 </head>
@@ -165,6 +166,11 @@ function hymnUrl(number, title) {
 function normalize(d) {
   var out = { ward: d.wardName || 'Kingston Ward', weeks: [], events: [] };
   [d.meeting].concat(d.next || []).forEach(function (m) { if (m && m.date) out.weeks.push(buildMeeting(m, d.meetingTime)); });
+  // Next Sunday isn't published yet: still give it a tab, with only its date.
+  if (out.weeks.length === 1) {
+    var nx = new Date(ymdDate(out.weeks[0].date).getTime() + 7 * 864e5).toISOString().slice(0, 10);
+    out.weeks.push({ title: 'Sacrament meeting', date: nx, time: d.meetingTime || '', roles: [], items: [], announcements: [], note: '', pending: true });
+  }
   out.events = (d.events || []).map(function (e, i) {
     var ev = { id: (e.date || '') + '-' + slug(e.title), date: e.date, rawTitle: e.title || '', title: e.title || 'Event', location: e.location || '', stake: !!e.stake };
     if (e.start) { ev.start = zonedIso(e.date, e.start); if (e.end) ev.end = zonedIso(e.date, e.end); }
@@ -174,7 +180,9 @@ function normalize(d) {
   return out;
 }
 /* Not decided yet: show a quiet TBD instead of leaving the line out. */
-var TBD = 'TBD';
+var TBD = 'To be announced';
+// The bishop presides unless the app says otherwise. Update when the bishop changes.
+var DEFAULT_PRESIDING = 'Bishop Burton';
 function hymnOrTbd(label, v) { return v ? hymn(label, v) : { type: 'hymn', label: label, title: TBD, tbd: true }; }
 function personOrTbd(label, v) { return v ? { type: 'person', label: label, name: v } : { type: 'person', label: label, name: TBD, tbd: true }; }
 function buildMeeting(m, time) {
@@ -184,7 +192,7 @@ function buildMeeting(m, time) {
     var mt = { title: m.type && m.type !== 'Sacrament meeting' ? m.type : 'Sacrament meeting', date: m.date, time: time || '', roles: [], items: [], note: '' };
     if (conf) mt.note = m.type + ' — no sacrament meeting in the ward building today.';
     else {
-      mt.roles = [['Presiding', m.presiding], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
+      mt.roles = [['Presiding', m.presiding || DEFAULT_PRESIDING], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
         .map(function (r) { return { label: r[0], name: r[1] || TBD, tbd: !r[1] }; });
       var it = mt.items;
       it.push(hymnOrTbd('Opening hymn', m.openingHymn));
@@ -345,6 +353,7 @@ function paint() {
     $('title').innerHTML = titleHtml(m.title);
     showArt(m.date, m.title);
     if (m.note) h += '<p class="status">' + esc(m.note) + '</p>';
+    if (m.pending) h += '<p class="status pending">Program coming soon. Check back later this week.</p>';
     if (m.roles.length) {
       h += '<section class="people" aria-label="Meeting leaders">' + m.roles.map(function (r) {
         return '<div class="row"><span class="k">' + esc(r.label) + '</span><span class="v' + (r.tbd ? ' tbd' : '') + '">' + esc(r.name) + '</span></div>';
