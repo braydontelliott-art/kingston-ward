@@ -14,10 +14,11 @@
 <meta name="application-name" content="Kingston Ward">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
   --ground:#1E4D45; --ground-ink:#FFFFFF; --ground-soft:#D3E3DF;
+  --brand:#FF8A1F; --wordmark:#2A1A3E;
   --page:#F6F7F5; --card:#FFFFFF; --ink:#1A1F1E; --muted:#5A6462; --soft:#3E4846;
   --line:#ECEEEC; --line-2:#DDE1DF; --btn-line:#CDD3D1;
   --btn-bg:#1E4D45; --btn-bg-hover:#163A34; --btn-ink:#FFFFFF;
@@ -26,7 +27,7 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --ground:#173B35; --ground-soft:#B9D1CB;
+    --ground:#173B35; --ground-soft:#B9D1CB; --wordmark:#FFFFFF;
     --page:#111514; --card:#1A201F; --ink:#EEF2F0; --muted:#A3AEAB; --soft:#C6CFCC;
     --line:#262E2C; --line-2:#2E3735; --btn-line:#3A4542;
     --btn-bg:#B9D1CB; --btn-bg-hover:#D3E3DF; --btn-ink:#0F1F1C;
@@ -36,7 +37,9 @@
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--page);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.4}
 a{color:inherit}
-.wrap{max-width:560px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+/* Wardy frame: the ward's own look stays up front; Wardy is only this top bar and the footer wordmark. */
+body::before{content:"";display:block;height:4px;background:var(--brand)}
+.wrap{max-width:560px;margin:0 auto;min-height:calc(100vh - 4px);display:flex;flex-direction:column}
 .hero{background:var(--ground);color:var(--ground-ink);padding:calc(28px + env(safe-area-inset-top)) 24px 36px;display:flex;flex-direction:column;gap:48px}
 .ward{font-size:15px;font-weight:600;letter-spacing:.01em}
 .when{font-size:14px;color:var(--ground-soft)}
@@ -72,7 +75,9 @@ h2{margin:0 0 14px;font-family:var(--serif);font-weight:400;font-size:30px}
 .menu a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:8px;text-decoration:none;font-size:15px}
 .menu a:hover,.menu a:focus-visible{background:var(--line)}
 .empty{color:var(--muted);font-size:15px;padding:8px 0 0}
-footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom));font-size:13px;color:var(--muted)}
+footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom));font-size:13px;color:var(--muted);display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+footer .wordmark{font:800 15px/1 "Bricolage Grotesque",var(--sans);letter-spacing:-.03em;color:var(--wordmark)}
+footer .wordmark i{font-style:normal;color:var(--brand)}
 .status{padding:48px 24px;color:var(--muted)}
 .skel{background:var(--line);border-radius:8px;height:18px;margin:10px 0}
 .hero{position:relative;overflow:hidden}
@@ -110,7 +115,7 @@ a.hymn-link .ext{display:inline-block;vertical-align:4px;margin-left:6px;color:v
     </div>
   </header>
   <main id="main"><div class="status"><div class="skel" style="width:60%"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:40%"></div></div></main>
-  <footer>mywardy.com/kingston</footer>
+  <footer><span>mywardy.com/kingston</span><span class="wordmark">wardy<i>.</i></span></footer>
 </div>
 
 <script>
