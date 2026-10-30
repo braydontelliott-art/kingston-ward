@@ -89,6 +89,7 @@ footer{margin-top:auto;padding:32px 24px calc(32px + env(safe-area-inset-bottom)
 a.hymn-link{text-decoration:underline;text-decoration-color:var(--line-2);text-underline-offset:4px;text-decoration-thickness:1px}
 a.hymn-link:hover{text-decoration-color:currentColor}
 a.hymn-link .ext{display:inline-block;vertical-align:4px;margin-left:6px;color:var(--muted)}
+.tbd{color:var(--muted) !important;font-style:italic;font-weight:400 !important}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
 </head>
@@ -172,6 +173,10 @@ function normalize(d) {
   });
   return out;
 }
+/* Not decided yet: show a quiet TBD instead of leaving the line out. */
+var TBD = 'TBD';
+function hymnOrTbd(label, v) { return v ? hymn(label, v) : { type: 'hymn', label: label, title: TBD, tbd: true }; }
+function personOrTbd(label, v) { return v ? { type: 'person', label: label, name: v } : { type: 'person', label: label, name: TBD, tbd: true }; }
 function buildMeeting(m, time) {
   var mt;
   {
@@ -180,12 +185,12 @@ function buildMeeting(m, time) {
     if (conf) mt.note = m.type + ' — no sacrament meeting in the ward building today.';
     else {
       mt.roles = [['Presiding', m.presiding], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
-        .filter(function (r) { return r[1]; }).map(function (r) { return { label: r[0], name: r[1] }; });
+        .map(function (r) { return { label: r[0], name: r[1] || TBD, tbd: !r[1] }; });
       var it = mt.items;
-      if (m.openingHymn) it.push(hymn('Opening hymn', m.openingHymn));
-      if (m.invocation) it.push({ type: 'person', label: 'Invocation', name: m.invocation });
+      it.push(hymnOrTbd('Opening hymn', m.openingHymn));
+      it.push(personOrTbd('Invocation', m.invocation));
       it.push({ type: 'part', text: 'Ward & stake business' });
-      if (m.sacramentHymn) it.push(hymn('Sacrament hymn', m.sacramentHymn));
+      it.push(hymnOrTbd('Sacrament hymn', m.sacramentHymn));
       it.push({ type: 'part', text: 'Administration of the sacrament' });
       var music = m.musicalNumber ? { type: 'person', label: 'Musical number', name: m.musicalNumber } : m.intermediateHymn ? hymn('Intermediate hymn', m.intermediateHymn) : null;
       if (fast) it.push({ type: 'part', text: 'Bearing of testimonies' });
@@ -197,9 +202,10 @@ function buildMeeting(m, time) {
           if (music && !placed && i + 1 === after && i < sp.length - 1) { it.push(music); placed = true; }
         });
         if (music && !placed) it.push(music);
+        if (!sp.length) it.push({ type: 'talk', label: 'Speakers', name: TBD, topic: '', tbd: true });
       }
-      if (m.closingHymn) it.push(hymn('Closing hymn', m.closingHymn));
-      if (m.benediction) it.push({ type: 'person', label: 'Benediction', name: m.benediction });
+      it.push(hymnOrTbd('Closing hymn', m.closingHymn));
+      it.push(personOrTbd('Benediction', m.benediction));
     }
     mt.announcements = lines(m.announcements).map(function (a) { return { text: a }; });
   }
@@ -341,7 +347,7 @@ function paint() {
     if (m.note) h += '<p class="status">' + esc(m.note) + '</p>';
     if (m.roles.length) {
       h += '<section class="people" aria-label="Meeting leaders">' + m.roles.map(function (r) {
-        return '<div class="row"><span class="k">' + esc(r.label) + '</span><span class="v">' + esc(r.name) + '</span></div>';
+        return '<div class="row"><span class="k">' + esc(r.label) + '</span><span class="v' + (r.tbd ? ' tbd' : '') + '">' + esc(r.name) + '</span></div>';
       }).join('') + '</section>';
     }
     if (m.items.length) {
@@ -349,14 +355,14 @@ function paint() {
         if (it.type === 'hymn') {
           var no = it.number ? ' · No. ' + esc(it.number) : '', url = hymnUrl(it.number, it.title);
           var title = url ? '<a class="hymn hymn-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(it.title) + LINK_ICON + '</a>'
-            : '<span class="hymn">' + esc(it.title) + '</span>';
+            : '<span class="hymn' + (it.tbd ? ' tbd' : '') + '">' + esc(it.title) + '</span>';
           return '<li><span class="lbl">' + esc(it.label) + no + '</span>' + title + '</li>';
         }
         if (it.type === 'talk') {
-          return '<li><span class="lbl">' + esc(it.label) + '</span><span class="hymn">' + esc(it.name) + '</span>' + (it.topic ? '<span class="topic">' + esc(it.topic) + '</span>' : '') + '</li>';
+          return '<li><span class="lbl">' + esc(it.label) + '</span><span class="hymn' + (it.tbd ? ' tbd' : '') + '">' + esc(it.name) + '</span>' + (it.topic ? '<span class="topic">' + esc(it.topic) + '</span>' : '') + '</li>';
         }
         if (it.type === 'person') {
-          return '<li class="row"><span class="k">' + esc(it.label) + '</span><span class="v">' + esc(it.name) + '</span></li>';
+          return '<li class="row"><span class="k">' + esc(it.label) + '</span><span class="v' + (it.tbd ? ' tbd' : '') + '">' + esc(it.name) + '</span></li>';
         }
         return '<li><span class="part">' + esc(it.text) + '</span></li>';
       }).join('') + '</ol>';
