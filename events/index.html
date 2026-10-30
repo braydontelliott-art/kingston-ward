@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kingston Ward · Events</title>
+<title>Wardy Events · Kingston Ward</title>
 <meta name="theme-color" content="#0d9488">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -45,7 +45,7 @@ p{color:var(--muted);margin:0 0 22px}
 var API_URL = 'https://script.google.com/macros/s/AKfycbwHhe6NFkzuVRytUj_SZupoUX4XBD3FkGrtdTtSuHQF-0BWBrGGsFc4x9CNJjLQ9tgp/exec';   // Ward Events web app (runs as the owner)
 var CLIENT_ID = '781984210146-toor95vmf1716m7qefm9utperhj0n56u.apps.googleusercontent.com';
 var KEY = 'we_session';
-// Same site as the Bishopric Board (/app/): if this device is signed in there, use that instead of a second Google sign-in.
+// Same site as Wardy (/app/): if this device is signed in there, use that instead of a second Google sign-in.
 var BOARD_API = 'https://script.google.com/macros/s/AKfycbxTmstrn1ETmsEnobIx9-MB12Mw8LCsdHlzGO41-UxkxitVuE224xnl8wTXhK3BlzRo/exec', BOARD_KEY = 'bb_session';
 
 function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
@@ -64,7 +64,7 @@ var RETURN_TOKEN = '', RETURN_ERR = '', HANDOFF = '';
   var h = location.hash.replace(/^#/, ''); if (!h) return;
   var p = {}; h.split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); });
   if (p.session) store(KEY, p.session);
-  if (p.handoff) HANDOFF = p.handoff;   // opened from the Bishopric Board: one-time pass, no second sign-in
+  if (p.handoff) HANDOFF = p.handoff;   // opened from Wardy: one-time pass, no second sign-in
   if (p.id_token) { if (p.state && p.state === read('we_state')) RETURN_TOKEN = p.id_token; else RETURN_ERR = 'Sign-in didn’t match. Please try again.'; }
   if (p.error && p.error !== 'access_denied') RETURN_ERR = 'Google sign-in didn’t go through. Please try again.';
   store('we_state', null);

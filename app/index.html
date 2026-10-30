@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kingston Ward · Bishopric</title>
+<title>Wardy · Kingston Ward</title>
 <meta name="theme-color" content="#0d9488">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Bishopric">
+<meta name="apple-mobile-web-app-title" content="Wardy">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -35,13 +35,13 @@ p{color:var(--muted);margin:0 0 22px}
 <body>
 <div class="wrap"><div class="card" id="card">
   <img class="logo" src="icon-192.png" alt="">
-  <h1>Kingston Ward</h1>
-  <p>Bishopric</p>
+  <h1>Wardy</h1>
+  <p>Kingston Ward</p>
   <div class="spin" id="spin"></div>
 </div></div>
 <script>
-/* Kingston Ward · Bishopric — installable shell.
-   Signs in with Google (name + email only), then loads the Bishopric Board from its Apps Script API.
+/* Wardy · Kingston Ward — installable shell.
+   Signs in with Google (name + email only), then loads Wardy from its Apps Script API.
    Nothing ward-related lives in this file; the API checks every request against the Members list. */
 var API_URL = 'https://script.google.com/macros/s/AKfycbxTmstrn1ETmsEnobIx9-MB12Mw8LCsdHlzGO41-UxkxitVuE224xnl8wTXhK3BlzRo/exec';           // "App API" deployment of the Bishopric Board script
 var CLIENT_ID = '781984210146-toor95vmf1716m7qefm9utperhj0n56u.apps.googleusercontent.com';
@@ -53,7 +53,7 @@ function post(body) {
   return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
     .then(function (r) { return r.json(); });
 }
-function card(html) { document.getElementById('card').innerHTML = '<img class="logo" src="icon-192.png" alt=""><h1>Kingston Ward</h1><p>Bishopric</p>' + html; }
+function card(html) { document.getElementById('card').innerHTML = '<img class="logo" src="icon-192.png" alt=""><h1>Wardy</h1><p>Kingston Ward</p>' + html; }
 function iosStandalone() { return window.navigator.standalone === true; }
 
 // Returning from Google's full-page sign-in (iPhone home-screen app): Google sends the ID token straight
