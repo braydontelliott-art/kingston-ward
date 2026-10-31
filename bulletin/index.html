@@ -100,6 +100,16 @@ a.hymn-link .ext{display:inline-block;vertical-align:4px;margin-left:6px;color:v
 .tbd{color:var(--muted) !important;font-style:italic;font-weight:400 !important}
 .status.pending{margin:20px 16px 0;padding:28px 20px;background:var(--card);border-radius:18px;font-family:var(--serif);font-style:italic;font-size:22px;line-height:1.25;color:var(--soft)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.visit{margin:36px 16px 0;padding:20px;background:var(--card);border-radius:18px}
+.visit h2{margin-bottom:6px}
+.visit p{margin:0 0 4px;color:var(--soft);font-size:15px}
+.visit .where{margin-top:12px;color:var(--ink);font-weight:600}
+.visit .links{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.visit .links a{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:12px;font:600 14px var(--sans);text-decoration:none}
+.visit .go{background:var(--btn-bg);color:var(--btn-ink)}
+.visit .go:hover{background:var(--btn-bg-hover)}
+.visit .more{border:1px solid var(--btn-line);color:var(--ink)}
+.visit .links a:focus-visible{outline:3px solid var(--btn-bg);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -435,6 +445,7 @@ function paint() {
       '</div></div></div>';
   }).join('');
   h += '</section>';
+  h += visitHtml(raw.meetingTime);
   $('main').innerHTML = h;
 }
 function pickWeek(i, focus) {
@@ -444,7 +455,20 @@ function pickWeek(i, focus) {
   paint();
   if (focus) { var b = document.querySelector('.wk[data-week="' + i + '"]'); if (b) b.focus(); }
 }
-var LINK_ICON = '<svg class="ext" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg><span class="sr">(opens in Gospel Library)</span>';
+/* Visitors: what the Church's Kingston Ward page offers, so one QR code covers both. Update if the building or schedule changes. */
+var MEETINGHOUSE = '3254 Polk Ave, Ogden, UT';
+var SERVICE_LENGTH = '2 hours';
+var CHURCH_PAGE = 'https://local.churchofjesuschrist.org/en/units/us/ut/kingston-ward';
+var PIN_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+function visitHtml(time) {
+  var maps = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('The Church of Jesus Christ of Latter-day Saints, ' + MEETINGHOUSE);
+  return '<section class="visit" aria-labelledby="visit-h"><h2 id="visit-h">Visiting?</h2>' +
+    '<p>We’re glad you’re here. Everyone is welcome.</p>' +
+    '<p class="where">Sundays' + (time ? ' at ' + esc(time) : '') + ' · about ' + SERVICE_LENGTH + '<br>' + esc(MEETINGHOUSE) + '</p>' +
+    '<div class="links"><a class="go" href="' + esc(maps) + '" target="_blank" rel="noopener">' + PIN_ICON + 'Directions</a>' +
+    '<a class="more" href="' + esc(CHURCH_PAGE) + '" target="_blank" rel="noopener">New to the Church? Learn more</a></div></section>';
+}
+var LINK_ICON ='<svg class="ext" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg><span class="sr">(opens in Gospel Library)</span>';
 
 /* ---- add-to-calendar menus ---- */
 function closeMenus(except) {
