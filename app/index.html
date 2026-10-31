@@ -93,7 +93,7 @@ function boot() {
   if (saved) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { show(saved); }); else show(saved); return; }
   card('<div class="spin"></div><p class="small">Loading…</p>');
   post({ fn: 'app', session: s }).then(function (j) {
-    if (!j.ok) { if (j.auth) { store(KEY, null); return signInScreen(); } throw new Error(j.error); }
+    if (!j.ok) { if (j.auth) { wipeDevice(); return signInScreen(); } throw new Error(j.error); }
     store(APP_HTML, j.result); show(j.result);
   }).catch(function (e) {
     card('<p class="err">Couldn’t load: ' + String(e.message || e) + '</p><button class="btn" onclick="boot()">Try again</button>');
@@ -101,6 +101,8 @@ function boot() {
 }
 
 var APP_HTML = 'bb_app_html';
+// A session the server refused: nothing saved for the app stays on this device, even when the app copy itself was never saved.
+function wipeDevice() { try { Object.keys(localStorage).forEach(function (k) { if (k === KEY || k === APP_HTML || k === 'bb_photos' || k.indexOf('bb_data:') === 0) localStorage.removeItem(k); }); } catch (e) {} }
 function show(html) {
   var shim = '<script>(' + appShim.toString() + ')(' + JSON.stringify(API_URL) + ',' + JSON.stringify(KEY) + ',' + JSON.stringify(APP_HTML) + ');<\/script>';
   // The app page has no icon or home-screen tags of its own: carry this page's over so the tab icon and home-screen app stay.
