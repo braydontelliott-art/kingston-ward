@@ -438,7 +438,8 @@ function paint() {
       return '<p>' + esc(a.text) + '</p>';
     }).join('') + '</section>';
   }
-  var evs = d.events;
+  // A later Sunday's Coming up starts that Sunday: events that will be over by then drop off (Brady, Nov 5, 2026). This Sunday keeps everything from today.
+  var evs = STATE.week > 0 && m && m.date ? d.events.filter(function (ev) { return (ev.date || '') >= m.date; }) : d.events;
   h += '<section class="up" aria-labelledby="up-h"><h2 id="up-h">Coming up</h2>';
   if (!evs.length) h += '<p class="empty">Nothing on the calendar yet.</p>';
   h += evs.map(function (ev, i) {
