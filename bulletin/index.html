@@ -239,7 +239,8 @@ function buildMeeting(m, time) {
         if (music && !placed) it.push(music);
         if (!sp.length && !primary) it.push({ type: 'talk', label: 'Speakers', name: TBD, topic: '', tbd: true });
       }
-      it.push(hymnOrTbd('Closing hymn', m.closingHymn));
+      // "No closing hymn this Sunday" in Wardy (a Primary program, say): leave the line out instead of To be announced.
+      if (m.noClosingHymn !== 'Yes') it.push(hymnOrTbd('Closing hymn', m.closingHymn));
       it.push(personOrTbd('Benediction', m.benediction));
       // "Other" has no set format: show only what was entered.
       if (other) {
