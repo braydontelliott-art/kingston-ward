@@ -188,7 +188,7 @@ function hymnUrl(number, title) {
 /* getBulletinData_() → what the page renders. Every published Sunday gets its own full program. */
 function normalize(d) {
   var out = { ward: d.wardName || 'Kingston Ward', weeks: [], events: [] };
-  [d.meeting].concat(d.next || []).forEach(function (m) { if (m && m.date) out.weeks.push(buildMeeting(m, d.meetingTime)); });
+  [d.meeting].concat(d.next || []).forEach(function (m) { if (m && m.date) out.weeks.push(buildMeeting(m, d.meetingTime, d.bishop)); });
   // Next Sunday isn't published yet: still give it a tab, with only its date.
   if (out.weeks.length === 1) {
     var nx = new Date(ymdDate(out.weeks[0].date).getTime() + 7 * 864e5).toISOString().slice(0, 10);
@@ -205,10 +205,10 @@ function normalize(d) {
 /* Not decided yet: show a quiet TBD instead of leaving the line out. */
 var TBD = 'To be announced';
 // The bishop presides unless the app says otherwise. Update when the bishop changes.
-var DEFAULT_PRESIDING = 'Bishop Burton';
+var DEFAULT_PRESIDING = 'Bishop Burton';   // only if the data doesn't say (Wardy sends d.bishop from its Users list)
 function hymnOrTbd(label, v) { return v ? hymn(label, v) : { type: 'hymn', label: label, title: TBD, tbd: true }; }
 function personOrTbd(label, v) { return v ? { type: 'person', label: label, name: v } : { type: 'person', label: label, name: TBD, tbd: true }; }
-function buildMeeting(m, time) {
+function buildMeeting(m, time, bishop) {
   var mt;
   {
     var conf = /Conference/.test(m.type || '') && m.type !== 'Ward Conference', fast = /Fast/.test(m.type || '');
@@ -217,7 +217,7 @@ function buildMeeting(m, time) {
     if (conf) { mt.time = ''; mt.note = m.type + ' — no sacrament meeting in the ward building today.'; }
     else {
       // A member of the stake presidency usually presides at ward conference, so only the bishop's regular Sundays default to him.
-      var presiding = m.presiding || (other || m.type === 'Ward Conference' ? '' : DEFAULT_PRESIDING);
+      var presiding = m.presiding || (other || m.type === 'Ward Conference' ? '' : bishop || DEFAULT_PRESIDING);
       mt.roles = [['Presiding', presiding], ['Conducting', m.conducting], ['Chorister', m.chorister], ['Organist', m.organist]]
         .map(function (r) { return { label: r[0], name: r[1] || TBD, tbd: !r[1] }; });
       // Same person presiding and conducting: one line, not two.
